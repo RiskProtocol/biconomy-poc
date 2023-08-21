@@ -91,27 +91,27 @@ function App() {
         aria-label="Vertical tabs"
         className={classes.tabs}
       >
-        <Tab label="Ethers + Custom + EIP712 Sign" {...a11yProps(0)} />
-        <Tab label="Ethers + Custom + Personal Sign" {...a11yProps(1)} />
+        {/* <Tab label="Ethers + Custom + EIP712 Sign" {...a11yProps(0)} />
+        <Tab label="Ethers + Custom + Personal Sign" {...a11yProps(1)} /> */}
         <Tab label="Ethers + EIP2771 + EIP712 Sign" {...a11yProps(2)} />
-        <Tab label="Ethers + EIP2771 + Personal Sign" {...a11yProps(3)} />
+        {/* <Tab label="Ethers + EIP2771 + Personal Sign" {...a11yProps(3)} />
         <Tab label="Web3 + Custom + EIP712 Sign" {...a11yProps(4)} />
         <Tab label="Web3 + Custom + Personal Sign" {...a11yProps(5)} />
         <Tab label="Web3 + EIP2771 + EIP712 Sign" {...a11yProps(6)} />
-        <Tab label="Web3 + EIP2771 + Personal Sign" {...a11yProps(7)} />
+        <Tab label="Web3 + EIP2771 + Personal Sign" {...a11yProps(7)} /> */}
         {/* <Tab label="Ethers + Forward + EIP712 Sign" {...a11yProps(8)} /> */}
       </Tabs>
 
-      <TabPanel value={value} index={0}>
+      {/* <TabPanel value={value} index={0}>
         <Ethers_Custom_EIP712Sign />
       </TabPanel>
       <TabPanel value={value} index={1}>
         <Ethers_Custom_PersonalSign />
-      </TabPanel>
-      <TabPanel value={value} index={2}>
+      </TabPanel> */}
+      <TabPanel value={value} index={0}>
         <Ethers_EIP2771_EIP712Sign />
       </TabPanel>
-      <TabPanel value={value} index={3}>
+      {/* <TabPanel value={value} index={3}>
         <Ethers_EIP2771_PersonalSign />
       </TabPanel>
       <TabPanel value={value} index={4}>
@@ -125,7 +125,7 @@ function App() {
       </TabPanel>
       <TabPanel value={value} index={7}>
         <Web3_EIP2771_PersonalSign />
-      </TabPanel>
+      </TabPanel> */}
     </div>
   );
 }

@@ -5,7 +5,6 @@ import { ethers } from "ethers";
 import { useAccount, useNetwork, useSigner } from "wagmi";
 import { signERC2612Permit } from 'eth-permit';
 import { Biconomy } from "@biconomy/mexa";
-import useGetQuoteFromNetwork from "../hooks/useGetQuoteFromNetwork";
 import {
   getConfig,
   ExternalProvider,
@@ -28,7 +27,7 @@ function App() {
 
   const [backdropOpen, setBackdropOpen] = React.useState(false);
   const [loadingMessage, setLoadingMessage] = React.useState("");
-  const [newQuote, setNewQuote] = useState("");
+  const [amount, setAmount] = useState(1);
   const [metaTxEnabled] = useState(true);
   const [transactionHash, setTransactionHash] = useState("");
   const [config, setConfig] = useState(getConfig("").configEIP2771);
@@ -37,11 +36,6 @@ function App() {
     const conf = getConfig(chain?.id.toString() || "").configEIP2771;
     setConfig(conf);
   }, [chain?.id]);
-
-  const { quote, owner, fetchQuote } = useGetQuoteFromNetwork(
-    config.contract.address,
-    config.contract.abi
-  );
 
   useEffect(() => {
     const initBiconomy = async () => {
@@ -65,40 +59,50 @@ function App() {
       showErrorMessage("Please connect wallet");
       return;
     }
-    if (!newQuote) {
+    if (!amount) {
       showErrorMessage("Please enter the quote");
       return;
     }
     setTransactionHash("");
     if (metaTxEnabled) {
       showInfoMessage(`Getting user signature`);
-      sendTransaction(address!, newQuote);
+      sendTransaction(address!, amount);
     } else {
       console.log("Sending normal transaction");
-      // let tx = await contract.setQuote(newQuote, {
-      //   from: address,
-      // });
-      // setTransactionHash(tx.transactionHash);
-      // tx = await tx.wait(1);
-      // console.log(tx);
       showSuccessMessage("Transaction confirmed");
-      fetchQuote();
     }
   };
 
-  const sendTransaction = async (userAddress: string, arg: string) => {
+  const sendTransaction = async (userAddress: string, arg: number) => {
     try {
       showInfoMessage(`Sending transaction via Biconomy`);
+
       const provider = await biconomy.provider;
+
+      // const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+      // const signer = provider.getSigner();
+
       const contractInstance = new ethers.Contract(
         config.contract.address,
         config.contract.abi,
+        // signer
         biconomy.ethersProvider
       );
 
       const value = ethers.utils.parseEther("1").toString();
 
       const result = await signERC2612Permit(provider, underlying, address!, factory, value);
+
+      // const deposit = await contractInstance.depositWithPermit(
+      //   ethers.utils.parseEther(arg.toString()),
+      //   address,
+      //   result.deadline,
+      //   result.v,
+      //   result.r,
+      //   result.s
+      // );
+
+      // console.log('deposit', deposit);
 
       let { data } = await contractInstance.populateTransaction.depositWithPermit(
           ethers.utils.parseEther("1"),
@@ -125,29 +129,14 @@ function App() {
       biconomy.on("txMined", (data: any) => {
         console.log(data);
         showSuccessMessage(`tx mined ${data.hash}`);
-        fetchQuote();
       });
     } catch (error) {
-      fetchQuote();
       console.log(error);
     }
   };
 
   return (
     <div className="App">
-      <section className="main">
-        <div className="flex">
-          <p className="mb-author">Quote: {quote}</p>
-        </div>
-
-        <p className="mb-author">Quote owner: {owner}</p>
-        {address?.toLowerCase() === owner?.toLowerCase() && (
-          <cite className="owner">You are the owner of the quote</cite>
-        )}
-        {address?.toLowerCase() !== owner?.toLowerCase() && (
-          <cite>You are not the owner of the quote</cite>
-        )}
-      </section>
       <section>
         {transactionHash !== "" && (
           <Box className={classes.root} mt={2} p={2}>
@@ -166,12 +155,12 @@ function App() {
       </section>
       <section>
         <div className="submit-container">
+          <label>Enter Amount to deposit</label>
           <div className="submit-row">
             <input
-              type="text"
-              placeholder="Enter your quote"
-              onChange={(event) => setNewQuote(event.target.value)}
-              value={newQuote}
+              type="number"
+              onChange={(event) => setAmount(parseFloat(event.target.value))}
+              value={amount}
             />
             <Button variant="contained" color="primary" onClick={onSubmit}>
               Submit
