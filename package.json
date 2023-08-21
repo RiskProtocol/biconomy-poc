@@ -20,7 +20,7 @@
     "wagmi": "^0.5.3",
     "web-vitals": "^2.1.4",
     "web3": "^1.7.4",
-    "webpack": "^5.73.0"
+    "webpack": "^5.76.0"
   },
   "scripts": {
     "dev": "react-app-rewired start",
