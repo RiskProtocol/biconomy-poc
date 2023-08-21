@@ -3,7 +3,7 @@ import { Button, Box, Typography, CircularProgress } from "@material-ui/core";
 import { Link, Backdrop, makeStyles } from "@material-ui/core";
 import { ethers } from "ethers";
 import { useAccount, useNetwork, useSigner } from "wagmi";
-
+import { signERC2612Permit } from 'eth-permit';
 import { Biconomy } from "@biconomy/mexa";
 import useGetQuoteFromNetwork from "../hooks/useGetQuoteFromNetwork";
 import {
@@ -15,6 +15,10 @@ import {
 } from "../utils";
 
 let biconomy: any;
+
+const target = "0x4C38C80c24bCE040f9CD852021ea903DE667D2Ad";
+const underlying = "0x9b395d973b115d9afE467203E082A06570fFBd19";
+const factory = "0x2A009e661979c4fB2D5423549575A4f2516B6Ac6";
 
 function App() {
   const classes = useStyles();
@@ -91,11 +95,23 @@ function App() {
         config.contract.abi,
         biconomy.ethersProvider
       );
-      let { data } = await contractInstance.populateTransaction.claim(1);
+
+      const value = ethers.utils.parseEther("1").toString();
+
+      const result = await signERC2612Permit(provider, underlying, address!, factory, value);
+
+      let { data } = await contractInstance.populateTransaction.depositWithPermit(
+          ethers.utils.parseEther("1"),
+          address,
+          result.deadline,
+          result.v,
+          result.r,
+          result.s
+        );
       let txParams = {
         data: data,
         to: config.contract.address,
-        from: "0xE041608922d06a4F26C0d4c27d8bCD01daf1f792",
+        from: "0x6E61Bef7CCff17367c5f5577164447A7623A33f6",
         signatureType: "EIP712_SIGN",
         gasLimit: 5000000,
       };
