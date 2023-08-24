@@ -2,55 +2,45 @@ import React, { useState, useEffect } from "react";
 import { Button, Box, Typography, CircularProgress } from "@material-ui/core";
 import { Link, Backdrop, makeStyles } from "@material-ui/core";
 import { ethers } from "ethers";
-import { useAccount, useNetwork, useSigner } from "wagmi";
+import { useAccount, useNetwork } from "wagmi";
 import { signERC2612Permit } from 'eth-permit';
-import { Biconomy } from "@biconomy/mexa";
 import {
   getConfig,
-  ExternalProvider,
   showErrorMessage,
   showInfoMessage,
   showSuccessMessage,
 } from "../utils";
 
-let biconomy: any;
+import {
+  IPaymaster,
+  IHybridPaymaster, 
+  SponsorUserOperationDto,
+  PaymasterMode,
+  BiconomyPaymaster,
+} from '@biconomy/paymaster';
+import { IBundler, Bundler } from '@biconomy/bundler'
+import { BiconomySmartAccount, BiconomySmartAccountConfig, DEFAULT_ENTRYPOINT_ADDRESS  } from "@biconomy/account";
 
-const target = "0x4C38C80c24bCE040f9CD852021ea903DE667D2Ad";
 const underlying = "0x9b395d973b115d9afE467203E082A06570fFBd19";
-const factory = "0x2A009e661979c4fB2D5423549575A4f2516B6Ac6";
+
 
 function App() {
   const classes = useStyles();
   const { address } = useAccount();
   const { chain } = useNetwork();
-  const { data: signer } = useSigner();
 
   const [backdropOpen, setBackdropOpen] = React.useState(false);
   const [loadingMessage, setLoadingMessage] = React.useState("");
   const [amount, setAmount] = useState(1);
   const [metaTxEnabled] = useState(true);
   const [transactionHash, setTransactionHash] = useState("");
-  const [config, setConfig] = useState(getConfig("").configEIP2771);
+  const [config, setConfig] = useState(getConfig("").configUnderlying);
+  const [smartAccount, setSmartAccount] = useState<any>(null);
 
   useEffect(() => {
-    const conf = getConfig(chain?.id.toString() || "").configEIP2771;
+    const conf = getConfig(chain?.id.toString() || "").configUnderlying;
     setConfig(conf);
   }, [chain?.id]);
-
-  useEffect(() => {
-    const initBiconomy = async () => {
-      setBackdropOpen(true);
-      setLoadingMessage("Initializing Biconomy ...");
-      biconomy = new Biconomy((signer?.provider as any).provider, {
-        apiKey: config.apiKey.prod,
-        debug: true,
-        contractAddresses: [config.contract.address],
-      });
-      await biconomy.init();
-      setBackdropOpen(false);
-    };
-    if (address && chain && signer?.provider) initBiconomy();
-  }, [address, chain, config, signer?.provider]);
 
   const onSubmit = async (e: any) => {
     e.preventDefault();
@@ -73,36 +63,67 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    const initBiconomy = async () => {
+      const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+      const signer = provider.getSigner();
+  
+      const bundler: IBundler = new Bundler({
+        bundlerUrl: "https://bundler.biconomy.io/api/v2/5/nJPK7B3ru.dd7f7861-190d-41bd-af80-6877f74b8f44",
+        chainId: 5,
+        entryPointAddress: DEFAULT_ENTRYPOINT_ADDRESS,
+      })
+  
+      const paymaster: IPaymaster = new BiconomyPaymaster({
+        paymasterUrl: "https://paymaster.biconomy.io/api/v1/5/xqDT1kr7w.cc23bfc8-dd79-4c0d-b418-ec694a04fc1b",
+      })
+  
+  
+      const biconomySmartAccountConfig: BiconomySmartAccountConfig = {
+        signer: signer,
+        chainId: 5,
+        bundler,
+        paymaster,
+      }
+  
+      let biconomySmartAccount = new BiconomySmartAccount(biconomySmartAccountConfig)
+      biconomySmartAccount =  await biconomySmartAccount.init()
+      console.log("Smart account address", await biconomySmartAccount.getSmartAccountAddress())
+      setSmartAccount(biconomySmartAccount)
+    }
+    initBiconomy()
+  }, [])
+
   const sendTransaction = async (userAddress: string, arg: number) => {
     try {
       showInfoMessage(`Sending transaction via Biconomy`);
 
-      const provider = await biconomy.provider;
 
-      // const provider = new ethers.providers.Web3Provider(window.ethereum as any);
-      // const signer = provider.getSigner();
+      const provider = new ethers.providers.Web3Provider(window.ethereum as any);
+      const signer = provider.getSigner();
 
       const contractInstance = new ethers.Contract(
         config.contract.address,
         config.contract.abi,
-        // signer
-        biconomy.ethersProvider
+        signer
       );
 
       const value = ethers.utils.parseEther("1").toString();
 
-      const result = await signERC2612Permit(provider, underlying, address!, factory, value);
+      const result = await signERC2612Permit(provider, underlying, address!, config.contract.address, value);
 
-      // const deposit = await contractInstance.depositWithPermit(
-      //   ethers.utils.parseEther(arg.toString()),
-      //   address,
-      //   result.deadline,
-      //   result.v,
-      //   result.r,
-      //   result.s
-      // );
+      const deposit = await contractInstance.depositWithPermit(
+          ethers.utils.parseEther("1"),
+          address,
+          result.deadline,
+          result.v,
+          result.r,
+          result.s
+      );
 
-      // console.log('deposit', deposit);
+      console.log('deposit', deposit);
+
+      console.log('result', result);
 
       let { data } = await contractInstance.populateTransaction.depositWithPermit(
           ethers.utils.parseEther("1"),
@@ -112,24 +133,33 @@ function App() {
           result.r,
           result.s
         );
+
       let txParams = {
         data: data,
         to: config.contract.address,
-        from: "0x6E61Bef7CCff17367c5f5577164447A7623A33f6",
-        signatureType: "EIP712_SIGN",
-        gasLimit: 5000000,
       };
-      console.log("txParams", txParams);
-      const tx = await provider.send("eth_sendTransaction", [txParams]);
-      console.log(tx);
-      biconomy.on("txHashGenerated", (data: any) => {
-        console.log(data);
-        showSuccessMessage(`tx hash ${data.hash}`);
-      });
-      biconomy.on("txMined", (data: any) => {
-        console.log(data);
-        showSuccessMessage(`tx mined ${data.hash}`);
-      });
+
+      const biconomyPaymaster =
+      smartAccount.paymaster as IHybridPaymaster<SponsorUserOperationDto>;
+      let paymasterServiceData: SponsorUserOperationDto = {
+        mode: PaymasterMode.SPONSORED,
+      };
+
+
+      console.log("here before userop")
+      let userOp = await smartAccount.buildUserOp([txParams]);
+      console.log({ userOp })
+      const paymasterAndDataResponse =
+        await biconomyPaymaster.getPaymasterAndData(
+          userOp,
+          paymasterServiceData
+        );
+
+      userOp.paymasterAndData = paymasterAndDataResponse.paymasterAndData;
+      const userOpResponse = await smartAccount.sendUserOp(userOp);
+      console.log("userOpHash", userOpResponse);
+      const { receipt } = await userOpResponse.wait(1);
+      console.log("txHash", receipt.transactionHash);
     } catch (error) {
       console.log(error);
     }
@@ -165,14 +195,6 @@ function App() {
             <Button variant="contained" color="primary" onClick={onSubmit}>
               Submit
             </Button>
-            {/* <Button
-              variant="contained"
-              color="primary"
-              onClick={onSubmitWithPrivateKey}
-              style={{ marginLeft: "10px" }}
-            >
-              Submit (using private key)
-            </Button> */}
           </div>
         </div>
       </section>
